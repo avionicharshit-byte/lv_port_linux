@@ -1,69 +1,66 @@
-#
 # Makefile
-#
-CC 				?= gcc
-LVGL_DIR_NAME 	?= lvgl
-LVGL_DIR 		?= .
 
-WARNINGS		:= -Wall -Wshadow -Wundef -Wmissing-prototypes -Wno-discarded-qualifiers -Wextra -Wno-unused-function -Wno-error=strict-prototypes -Wpointer-arith \
-					-fno-strict-aliasing -Wno-error=cpp -Wuninitialized -Wmaybe-uninitialized -Wno-unused-parameter -Wno-missing-field-initializers -Wtype-limits \
-					-Wsizeof-pointer-memaccess -Wno-format-nonliteral -Wno-cast-qual -Wunreachable-code -Wno-switch-default -Wreturn-type -Wmultichar -Wformat-security \
-					-Wno-ignored-qualifiers -Wno-error=pedantic -Wno-sign-compare -Wno-error=missing-prototypes -Wdouble-promotion -Wclobbered -Wdeprecated -Wempty-body \
-					-Wshift-negative-value -Wstack-usage=2048 -Wno-unused-value -std=gnu99
-CFLAGS 			?= -O3 -g0 -I$(LVGL_DIR)/ $(WARNINGS)
-LDFLAGS 		?= -lm
-BIN 			= main
-BUILD_DIR 		= ./build
-BUILD_OBJ_DIR 	= $(BUILD_DIR)/obj
-BUILD_BIN_DIR 	= $(BUILD_DIR)/bin
+# Compiler
+CC              ?= clang
 
-prefix 			?= /usr
-bindir 			?= $(prefix)/bin
+# LVGL Directory
+LVGL_DIR        ?= ./lvgl
 
-#Collect the files to compile
-MAINSRC          = ./main.c
+# Compiler Warnings and Flags
+WARNINGS        := -Wall -Wshadow -Wundef -Wmissing-prototypes -Wextra -Wno-unused-function -Wpointer-arith \
+                   -fno-strict-aliasing -Wuninitialized -Wno-unused-parameter -Wtype-limits \
+                   -Wformat-security -Wno-sign-compare -std=gnu99
 
-include $(LVGL_DIR)/lvgl/lvgl.mk
+CFLAGS          ?= -O3 -g0 -I$(LVGL_DIR)/ -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 $(WARNINGS)
+LDFLAGS         ?= -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_gfx -framework Cocoa
 
-CSRCS 			+=$(LVGL_DIR)/mouse_cursor_icon.c 
+# Build Directories
+BUILD_DIR       = ./build
+BUILD_OBJ_DIR   = $(BUILD_DIR)/obj
+BUILD_BIN_DIR   = $(BUILD_DIR)/bin
 
-OBJEXT 			?= .o
+# Install Directories
+prefix          ?= /usr
+bindir          ?= $(prefix)/bin
 
-AOBJS 			= $(ASRCS:.S=$(OBJEXT))
-COBJS 			= $(CSRCS:.c=$(OBJEXT))
+# Collect the files to compile
+MAINSRC         = ./main.c
+include $(LVGL_DIR)/lvgl.mk
 
-MAINOBJ 		= $(MAINSRC:.c=$(OBJEXT))
+# Object files
+AOBJS           = $(ASRCS:$(LVGL_PATH)/%.S=$(BUILD_OBJ_DIR)/%.o)
+COBJS           = $(CSRCS:$(LVGL_PATH)/%.c=$(BUILD_OBJ_DIR)/%.o)
+MAINOBJ         = $(MAINSRC:./%.c=$(BUILD_OBJ_DIR)/%.o)
+OBJS            = $(AOBJS) $(COBJS) $(MAINOBJ)
 
-SRCS 			= $(ASRCS) $(CSRCS) $(MAINSRC)
-OBJS 			= $(AOBJS) $(COBJS) $(MAINOBJ)
-TARGET 			= $(addprefix $(BUILD_OBJ_DIR)/, $(patsubst ./%, %, $(OBJS)))
-
-## MAINOBJ -> OBJFILES
-
-
+# Rules
 all: default
+
+$(BUILD_OBJ_DIR)/%.o: $(LVGL_PATH)/%.c
+	@mkdir -p $(dir $@)
+	@$(CC) $(CFLAGS) -c $< -o $@
+	@echo "CC $<"
 
 $(BUILD_OBJ_DIR)/%.o: %.c
 	@mkdir -p $(dir $@)
-	@$(CC)  $(CFLAGS) -c $< -o $@
+	@$(CC) $(CFLAGS) -c $< -o $@
 	@echo "CC $<"
 
-$(BUILD_OBJ_DIR)/%.o: %.S
+$(BUILD_OBJ_DIR)/%.o: $(LVGL_PATH)/%.S
 	@mkdir -p $(dir $@)
-	@$(CC)  $(CFLAGS) -c $< -o $@
-	@echo "CC $<"
+	@$(CC) $(CFLAGS) -c $< -o $@
+	@echo "AS $<"
 
-
-default: $(TARGET)
-	@mkdir -p $(dir $(BUILD_BIN_DIR)/)
-	$(CC) -o $(BUILD_BIN_DIR)/$(BIN) $(TARGET) $(LDFLAGS)
+default: $(OBJS)
+	@mkdir -p $(BUILD_BIN_DIR)
+	$(CC) -o $(BUILD_BIN_DIR)/main $(OBJS) $(LDFLAGS)
 
 clean: 
 	rm -rf $(BUILD_DIR)
 
 install:
 	install -d $(DESTDIR)$(bindir)
-	install $(BUILD_BIN_DIR)/$(BIN) $(DESTDIR)$(bindir)
+	install $(BUILD_BIN_DIR)/main $(DESTDIR)$(bindir)
 
 uninstall:
-	$(RM) -r $(addprefix $(DESTDIR)$(bindir)/,$(BIN))
+	$(RM) -r $(addprefix $(DESTDIR)$(bindir)/, main)
